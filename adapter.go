@@ -195,7 +195,7 @@ func (a *Adapter) GetModelInfos(
 }
 
 func (a *Adapter) GetAuthFlow() sdk.AuthFlowHandler {
-	return nil
+	return &GoogleAuthFlow{}
 }
 
 func (a *Adapter) GetDefaultProviders() []sdk.ProviderInfo {
@@ -207,6 +207,81 @@ func (a *Adapter) GetDefaultProviders() []sdk.ProviderInfo {
 			IconURL:   "https://www.gstatic.com/lamda/images/favicon_v1_150160cddff7f294ce30.svg",
 		},
 	}
+}
+
+type GoogleAuthFlow struct{}
+
+func (f *GoogleAuthFlow) InitiateFlow(ctx sdk.AuthFlowContext) (sdk.AuthFlowState, error) {
+	return sdk.AuthFlowState{
+		RenderHTML: `
+<div class="auth-flow-content">
+	<p><strong>Google AI Studio API Key</strong></p>
+	<p>Get your API key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a></p>
+	<div class="form-group">
+		<label for="api_key">API Key</label>
+		<input type="text" id="api_key" name="api_key" class="form-control" placeholder="AIza..." required />
+	</div>
+	<button type="submit" class="btn btn-primary">Add Credential</button>
+</div>`,
+	}, nil
+}
+
+func (f *GoogleAuthFlow) HandleStep(ctx sdk.AuthFlowContext, input map[string][]string) (sdk.AuthFlowState, error) {
+	apiKeyValues, ok := input["api_key"]
+	if !ok || len(apiKeyValues) == 0 {
+		return sdk.AuthFlowState{
+			RenderHTML: `
+<div class="auth-flow-content">
+	<div class="alert alert-danger">API key is required</div>
+	<p><strong>Google AI Studio API Key</strong></p>
+	<p>Get your API key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a></p>
+	<div class="form-group">
+		<label for="api_key">API Key</label>
+		<input type="text" id="api_key" name="api_key" class="form-control" placeholder="AIza..." required />
+	</div>
+	<button type="submit" class="btn btn-primary">Add Credential</button>
+</div>`,
+		}, nil
+	}
+
+	apiKey := strings.TrimSpace(apiKeyValues[0])
+	if apiKey == "" {
+		return sdk.AuthFlowState{
+			RenderHTML: `
+<div class="auth-flow-content">
+	<div class="alert alert-danger">API key cannot be empty</div>
+	<p><strong>Google AI Studio API Key</strong></p>
+	<p>Get your API key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a></p>
+	<div class="form-group">
+		<label for="api_key">API Key</label>
+		<input type="text" id="api_key" name="api_key" class="form-control" placeholder="AIza..." required />
+	</div>
+	<button type="submit" class="btn btn-primary">Add Credential</button>
+</div>`,
+		}, nil
+	}
+
+	if len(apiKey) < 20 {
+		return sdk.AuthFlowState{
+			RenderHTML: `
+<div class="auth-flow-content">
+	<div class="alert alert-danger">API key appears invalid (too short, must be at least 20 characters)</div>
+	<p><strong>Google AI Studio API Key</strong></p>
+	<p>Get your API key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a></p>
+	<div class="form-group">
+		<label for="api_key">API Key</label>
+		<input type="text" id="api_key" name="api_key" class="form-control" placeholder="AIza..." required />
+	</div>
+	<button type="submit" class="btn btn-primary">Add Credential</button>
+</div>`,
+		}, nil
+	}
+
+	return sdk.AuthFlowState{
+		Credentials: map[string]string{
+			"api_key": apiKey,
+		},
+	}, nil
 }
 
 var _ sdk.Adapter = (*Adapter)(nil)
