@@ -154,44 +154,72 @@ func (a *Adapter) GetModelInfos(
 	cred *sdk.Credential,
 	providerQualifier string,
 ) ([]sdk.ModelInfo, error) {
-	return []sdk.ModelInfo{
-		{
-			Name:          "gemini-2.5-flash",
-			DisplayName:   "Gemini 2.5 Flash",
-			RPM:           1000,
-			TPM:           1000000,
-			RPD:           1500,
-			ContextWindow: 1048576,
-			MaxTokens:     8192,
-		},
-		{
-			Name:          "gemini-3-flash-preview",
-			DisplayName:   "Gemini 3 Flash (Preview)",
-			RPM:           1000,
-			TPM:           1000000,
-			RPD:           1500,
-			ContextWindow: 1048576,
-			MaxTokens:     8192,
-		},
-		{
-			Name:          "gemini-3.1-pro-preview",
-			DisplayName:   "Gemini 3.1 Pro (Preview)",
-			RPM:           500,
-			TPM:           500000,
-			RPD:           1000,
-			ContextWindow: 2097152,
-			MaxTokens:     8192,
-		},
-		{
-			Name:          "gemini-3.1-flash-lite",
-			DisplayName:   "Gemini 3.1 Flash Lite",
-			RPM:           2000,
-			TPM:           2000000,
-			RPD:           3000,
-			ContextWindow: 1048576,
-			MaxTokens:     8192,
-		},
-	}, nil
+	apiKey := cred.Data["api_key"]
+
+	if a.client == nil {
+		a.client = newClient(baseURL)
+	}
+
+	models, err := a.client.listModels(ctx, apiKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list models: %w", err)
+	}
+
+	var flashRPM, flashTPM, flashRPD int64
+	var proRPM, proTPM, proRPD int64
+	var flashModelFound, proModelFound bool
+
+	for _, model := range models {
+		if !flashModelFound && strings.Contains(strings.ToLower(model.BaseModelId), "flash") {
+			flashRPM, flashTPM, flashRPD, _ = a.client.extractRateLimits(ctx, apiKey, model.BaseModelId)
+			flashModelFound = true
+		}
+		if !proModelFound && strings.Contains(strings.ToLower(model.BaseModelId), "pro") {
+			proRPM, proTPM, proRPD, _ = a.client.extractRateLimits(ctx, apiKey, model.BaseModelId)
+			proModelFound = true
+		}
+		if flashModelFound && proModelFound {
+			break
+		}
+	}
+
+	modelInfos := make([]sdk.ModelInfo, 0)
+
+	for _, model := range models {
+		if !isValidLLMModel(model) {
+			continue
+		}
+
+		var rpm, tpm, rpd int64
+
+		if strings.Contains(strings.ToLower(model.BaseModelId), "pro") {
+			rpm = proRPM
+			tpm = proTPM
+			rpd = proRPD
+		} else {
+			rpm = flashRPM
+			tpm = flashTPM
+			rpd = flashRPD
+		}
+
+		if rpm == 0 {
+			rpm = estimateRPM(model.BaseModelId)
+			tpm = estimateTPM(model.BaseModelId)
+			rpd = estimateRPD(model.BaseModelId)
+		}
+
+		modelInfos = append(modelInfos, sdk.ModelInfo{
+			Name:          model.BaseModelId,
+			DisplayName:   model.DisplayName,
+			RPM:           rpm,
+			TPM:           tpm,
+			RPD:           rpd,
+			ContextWindow: int64(model.InputTokenLimit),
+			MaxTokens:     int64(model.OutputTokenLimit),
+		})
+	}
+
+	return modelInfos, nil
 }
 
 func (a *Adapter) GetAuthFlow() sdk.AuthFlowHandler {
@@ -282,6 +310,76 @@ func (f *GoogleAuthFlow) HandleStep(ctx sdk.AuthFlowContext, input map[string][]
 			"api_key": apiKey,
 		},
 	}, nil
+}
+
+func isValidLLMModel(model ModelMetadata) bool {
+	if !supportsGenerateContent(model.SupportedGenerationMethods) {
+		return false
+	}
+
+	baseModelLower := strings.ToLower(model.BaseModelId)
+	if strings.Contains(baseModelLower, "embedding") {
+		return false
+	}
+	if strings.Contains(baseModelLower, "text-embedding") {
+		return false
+	}
+	if strings.Contains(baseModelLower, "aqa") {
+		return false
+	}
+
+	return true
+}
+
+func supportsGenerateContent(methods []string) bool {
+	for _, method := range methods {
+		if method == "generateContent" {
+			return true
+		}
+	}
+	return false
+}
+
+func estimateRPM(baseModelId string) int64 {
+	baseModelLower := strings.ToLower(baseModelId)
+	if strings.Contains(baseModelLower, "flash") {
+		if strings.Contains(baseModelLower, "lite") {
+			return 2000
+		}
+		return 1000
+	}
+	if strings.Contains(baseModelLower, "pro") {
+		return 500
+	}
+	return 1000
+}
+
+func estimateTPM(baseModelId string) int64 {
+	baseModelLower := strings.ToLower(baseModelId)
+	if strings.Contains(baseModelLower, "flash") {
+		if strings.Contains(baseModelLower, "lite") {
+			return 2000000
+		}
+		return 1000000
+	}
+	if strings.Contains(baseModelLower, "pro") {
+		return 500000
+	}
+	return 1000000
+}
+
+func estimateRPD(baseModelId string) int64 {
+	baseModelLower := strings.ToLower(baseModelId)
+	if strings.Contains(baseModelLower, "flash") {
+		if strings.Contains(baseModelLower, "lite") {
+			return 3000
+		}
+		return 1500
+	}
+	if strings.Contains(baseModelLower, "pro") {
+		return 1000
+	}
+	return 1500
 }
 
 var _ sdk.Adapter = (*Adapter)(nil)

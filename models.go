@@ -45,3 +45,19 @@ type GoogleErrorResponse struct {
 		Status  string `json:"status"`
 	} `json:"error"`
 }
+
+type ListModelsResponse struct {
+	Models        []ModelMetadata `json:"models"`
+	NextPageToken string          `json:"nextPageToken,omitempty"`
+}
+
+type ModelMetadata struct {
+	Name                       string   `json:"name"`
+	BaseModelId                string   `json:"baseModelId"`
+	Version                    string   `json:"version"`
+	DisplayName                string   `json:"displayName"`
+	Description                string   `json:"description"`
+	InputTokenLimit            int      `json:"inputTokenLimit"`
+	OutputTokenLimit           int      `json:"outputTokenLimit"`
+	SupportedGenerationMethods []string `json:"supportedGenerationMethods"`
+}
