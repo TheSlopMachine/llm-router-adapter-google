@@ -7,8 +7,10 @@ Official adapter for Google AI Studio (Gemini API) integration with llm-router.
 Add to your `adapters.conf`:
 
 ```
-github.com/TheSlopMachine/llm-router-adapter-google latest
+github.com/TheSlopMachine/llm-router-adapter-google main
 ```
+
+`main` fetches the current tip of the adapter's `main` branch. Go will still record the resolved result as a pseudo-version in the consumer's `go.mod`, so rerun `go get ...@main` or rebuild when you want newer commits.
 
 ## Configuration
 
