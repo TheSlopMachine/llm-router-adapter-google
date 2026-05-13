@@ -202,14 +202,16 @@ func (a *Adapter) GetModelInfos(
 			rpd = flashRPD
 		}
 
+		modelName := extractModelName(model)
+
 		if rpm == 0 {
-			rpm = estimateRPM(model.BaseModelId)
-			tpm = estimateTPM(model.BaseModelId)
-			rpd = estimateRPD(model.BaseModelId)
+			rpm = estimateRPM(modelName)
+			tpm = estimateTPM(modelName)
+			rpd = estimateRPD(modelName)
 		}
 
 		modelInfos = append(modelInfos, sdk.ModelInfo{
-			Name:          model.BaseModelId,
+			Name:          modelName,
 			DisplayName:   model.DisplayName,
 			RPM:           rpm,
 			TPM:           tpm,
@@ -220,6 +222,16 @@ func (a *Adapter) GetModelInfos(
 	}
 
 	return modelInfos, nil
+}
+
+func extractModelName(model ModelMetadata) string {
+	if model.Name != "" {
+		return strings.TrimPrefix(model.Name, "models/")
+	}
+	if model.BaseModelId != "" {
+		return model.BaseModelId
+	}
+	return "unknown-model"
 }
 
 func (a *Adapter) GetAuthFlow() sdk.AuthFlowHandler {
