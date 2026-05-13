@@ -53,11 +53,11 @@ type ListModelsResponse struct {
 
 type ModelMetadata struct {
 	Name                       string   `json:"name"`
-	BaseModelId                string   `json:"baseModelId"`
-	Version                    string   `json:"version"`
-	DisplayName                string   `json:"displayName"`
-	Description                string   `json:"description"`
-	InputTokenLimit            int      `json:"inputTokenLimit"`
-	OutputTokenLimit           int      `json:"outputTokenLimit"`
-	SupportedGenerationMethods []string `json:"supportedGenerationMethods"`
+	BaseModelId                string   `json:"baseModelId,omitempty"`
+	Version                    string   `json:"version,omitempty"`
+	DisplayName                string   `json:"displayName,omitempty"`
+	Description                string   `json:"description,omitempty"`
+	InputTokenLimit            int      `json:"inputTokenLimit,omitempty"`
+	OutputTokenLimit           int      `json:"outputTokenLimit,omitempty"`
+	SupportedGenerationMethods []string `json:"supportedGenerationMethods,omitempty"`
 }

@@ -170,12 +170,13 @@ func (a *Adapter) GetModelInfos(
 	var flashModelFound, proModelFound bool
 
 	for _, model := range models {
-		if !flashModelFound && strings.Contains(strings.ToLower(model.BaseModelId), "flash") {
-			flashRPM, flashTPM, flashRPD, _ = a.client.extractRateLimits(ctx, apiKey, model.BaseModelId)
+		modelName := extractModelName(model)
+		if !flashModelFound && strings.Contains(strings.ToLower(modelName), "flash") {
+			flashRPM, flashTPM, flashRPD, _ = a.client.extractRateLimits(ctx, apiKey, modelName)
 			flashModelFound = true
 		}
-		if !proModelFound && strings.Contains(strings.ToLower(model.BaseModelId), "pro") {
-			proRPM, proTPM, proRPD, _ = a.client.extractRateLimits(ctx, apiKey, model.BaseModelId)
+		if !proModelFound && strings.Contains(strings.ToLower(modelName), "pro") {
+			proRPM, proTPM, proRPD, _ = a.client.extractRateLimits(ctx, apiKey, modelName)
 			proModelFound = true
 		}
 		if flashModelFound && proModelFound {
@@ -186,13 +187,14 @@ func (a *Adapter) GetModelInfos(
 	modelInfos := make([]sdk.ModelInfo, 0)
 
 	for _, model := range models {
-		if !isValidLLMModel(model) {
+		modelName := extractModelName(model)
+		if !isValidLLMModel(modelName, model.SupportedGenerationMethods) {
 			continue
 		}
 
 		var rpm, tpm, rpd int64
 
-		if strings.Contains(strings.ToLower(model.BaseModelId), "pro") {
+		if strings.Contains(strings.ToLower(modelName), "pro") {
 			rpm = proRPM
 			tpm = proTPM
 			rpd = proRPD
@@ -202,17 +204,20 @@ func (a *Adapter) GetModelInfos(
 			rpd = flashRPD
 		}
 
-		modelName := extractModelName(model)
-
 		if rpm == 0 {
 			rpm = estimateRPM(modelName)
 			tpm = estimateTPM(modelName)
 			rpd = estimateRPD(modelName)
 		}
 
+		displayName := model.DisplayName
+		if displayName == "" {
+			displayName = modelName
+		}
+
 		modelInfos = append(modelInfos, sdk.ModelInfo{
 			Name:          modelName,
-			DisplayName:   model.DisplayName,
+			DisplayName:   displayName,
 			RPM:           rpm,
 			TPM:           tpm,
 			RPD:           rpd,
@@ -324,19 +329,16 @@ func (f *GoogleAuthFlow) HandleStep(ctx sdk.AuthFlowContext, input map[string][]
 	}, nil
 }
 
-func isValidLLMModel(model ModelMetadata) bool {
-	if !supportsGenerateContent(model.SupportedGenerationMethods) {
+func isValidLLMModel(modelName string, methods []string) bool {
+	if !supportsGenerateContent(methods) {
 		return false
 	}
 
-	baseModelLower := strings.ToLower(model.BaseModelId)
-	if strings.Contains(baseModelLower, "embedding") {
+	nameLower := strings.ToLower(modelName)
+	if strings.Contains(nameLower, "embedding") {
 		return false
 	}
-	if strings.Contains(baseModelLower, "text-embedding") {
-		return false
-	}
-	if strings.Contains(baseModelLower, "aqa") {
+	if strings.Contains(nameLower, "aqa") {
 		return false
 	}
 
